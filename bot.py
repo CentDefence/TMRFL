@@ -1,5 +1,6 @@
 import asyncio
 import time
+import os
 import aiosqlite
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import *
@@ -7,13 +8,12 @@ from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-TOKEN = "8712937703:AAEULzwqOk_XmNJhTwb2-OX4ISZ7pvBwbbA"
-ADMINS = [8214590613]
+TOKEN = os.getenv(8712937703:AAEULzwqOk_XmNJhTwb2-OX4ISZ7pvBwbbA)  # <-- теперь из Render
+ADMINS = [8214590613]  # <-- вставь свой ID
 
 bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# -------- АНТИ СПАМ --------
 cooldowns = {}
 COOLDOWN = 10
 
@@ -51,17 +51,14 @@ class Form(StatesGroup):
     fa = State()
     league = State()
     club = State()
-    report = State()
     transfer = State()
-    partner = State()
 
 # -------- МЕНЮ --------
-def main_menu():
+def menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📢 Объявление"), KeyboardButton(text="🚨 Жалоба")],
-            [KeyboardButton(text="🤝 Партнёрство"), KeyboardButton(text="🔄 Трансфер")],
-            [KeyboardButton(text="🛡 Verify")]
+            [KeyboardButton(text="🔄 Трансфер"), KeyboardButton(text="🛡 Verify")]
         ],
         resize_keyboard=True
     )
@@ -69,12 +66,7 @@ def main_menu():
 # -------- START --------
 @dp.message(Command("start"))
 async def start(msg: Message):
-    await msg.answer(
-        "👋 Привет! Это Трансфер Маркет RFL\n\n"
-        "🔗 t.me/RFLtransferMarket\n\n"
-        "👇 Используй меню ниже",
-        reply_markup=main_menu()
-    )
+    await msg.answer("👋 Трансфер Маркет RFL\n\n👇 Используй меню", reply_markup=menu())
 
 # -------- VERIFY --------
 @dp.message(F.text == "🛡 Verify")
@@ -85,11 +77,11 @@ async def verify(msg: Message, state: FSMContext):
 @dp.message(Form.verify)
 async def save_verify(msg: Message, state: FSMContext):
     await add_user(msg.from_user.id, msg.text)
-    await msg.answer("✅ Верификация пройдена!", reply_markup=main_menu())
+    await msg.answer("✅ Готово!", reply_markup=menu())
     await state.clear()
 
-async def is_verified(user_id):
-    return await get_user(user_id)
+async def is_verified(uid):
+    return await get_user(uid)
 
 # -------- ANNOUNCE --------
 @dp.message(F.text == "📢 Объявление")
@@ -102,18 +94,18 @@ async def announce(msg: Message):
         [InlineKeyboardButton(text="🏆 Лига", callback_data="league")],
         [InlineKeyboardButton(text="🏟 Клуб", callback_data="club")]
     ])
-    await msg.answer("Выберите:", reply_markup=kb)
+    await msg.answer("Выбери тип:", reply_markup=kb)
 
-# ---- FREE AGENT ----
+# FREE AGENT
 @dp.callback_query(F.data == "fa")
 async def fa(cb: CallbackQuery, state: FSMContext):
-    await cb.message.answer("Напишите позицию и о себе:")
+    await cb.message.answer("Напиши позицию и о себе:")
     await state.set_state(Form.fa)
 
 @dp.message(Form.fa)
 async def fa_send(msg: Message, state: FSMContext):
     if not anti_spam(msg.from_user.id):
-        return await msg.answer("⏳ Подожди немного")
+        return await msg.answer("⏳ Подожди")
 
     text = f"""
 📢 СВОБОДНЫЙ АГЕНТ
@@ -135,16 +127,6 @@ async def fa_send(msg: Message, state: FSMContext):
     await msg.answer("📨 Отправлено")
     await state.clear()
 
-# -------- REPORT --------
-@dp.message(F.text == "🚨 Жалоба")
-async def report(msg: Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Лига", callback_data="r1")],
-        [InlineKeyboardButton(text="Игрок", callback_data="r2")],
-        [InlineKeyboardButton(text="Клуб", callback_data="r3")]
-    ])
-    await msg.answer("Выбери тип:", reply_markup=kb)
-
 # -------- TRANSFER --------
 @dp.message(F.text == "🔄 Трансфер")
 async def transfer(msg: Message):
@@ -155,10 +137,7 @@ async def transfer(msg: Message):
 
 @dp.callback_query(F.data == "t1")
 async def t1(cb: CallbackQuery, state: FSMContext):
-    await cb.message.answer(
-        "❗️📢 ПЕРЕХОД\n\n"
-        "ник - клуб ➡️ клуб"
-    )
+    await cb.message.answer("ник - клуб ➡️ клуб")
     await state.set_state(Form.transfer)
 
 @dp.message(Form.transfer)
