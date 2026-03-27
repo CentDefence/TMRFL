@@ -117,17 +117,51 @@ async def fa_send(msg: Message, state: FSMContext):
         return await msg.answer("🚫 Бан\nАпелляция: @Sqvnix")
 
     if not spam(msg.from_user.id):
-        return await msg.answer("⏳ Подожди буквально минуточку")
+        return await msg.answer("⏳ Подожди буквально минуточкуc")
 
     data = await state.get_data()
     pos = data["pos"]
 
-    text = f"""📢 FREE AGENT
-@{msg.from_user.username} | {pos}
+@dp.message(Form.fa_text)
+async def fa_send(msg: Message, state: FSMContext):
+    if is_ban(msg.from_user.id):
+        return await msg.answer("🚫 Бан\nАпелляция: @sqvnix")
 
-📝 {msg.text}
-#FA #TMRFL"""
+    if not spam(msg.from_user.id):
+        return await msg.answer("⏳ Подожди немного")
 
+    data = await state.get_data()
+    pos = data["pos"]
+
+    # получаем Roblox ник
+    async with aiosqlite.connect("db.sqlite") as db:
+        cur = await db.execute("SELECT nick FROM users WHERE id=?", (msg.from_user.id,))
+        row = await cur.fetchone()
+        roblox = row[0] if row else "unknown"
+
+    username = f"@{msg.from_user.username}" if msg.from_user.username else "нет юзера"
+
+    text = f"""<b>📢 FREE AGENT ANNOUNCE</b>
+
+👤 <b>{username}</b> | 🎮 <b>{roblox}</b>
+
+⚽ <b>Position:</b> {pos}
+📝 <b>About:</b> {msg.text}
+
+#FreeAgent #TMRFL"""
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✉️ Написать игроку", url=f"https://t.me/{msg.from_user.username}") if msg.from_user.username else InlineKeyboardButton(text="❌ Нет юзера", callback_data="none")],
+        [InlineKeyboardButton(text="✅ Принять", callback_data=f"ok_{msg.from_user.id}"),
+         InlineKeyboardButton(text="❌ Отклонить", callback_data=f"no_{msg.from_user.id}")],
+        [InlineKeyboardButton(text="🚫 Бан", callback_data=f"ban_{msg.from_user.id}")]
+    ])
+
+    for admin in ADMINS:
+        await bot.send_message(admin, text, reply_markup=kb, parse_mode="HTML")
+
+    await state.clear()
+    await msg.answer("⏳ Заявка отправлена\nЖди ответа")
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅", callback_data=f"ok_{msg.from_user.id}")],
         [InlineKeyboardButton(text="❌", callback_data=f"no_{msg.from_user.id}")],
@@ -181,38 +215,7 @@ async def transfer_send(msg: Message, state: FSMContext):
         await bot.send_message(admin, text)
 
     await state.clear()
-    await msg.answer("⏳ Отправлено\nОжидай")
-
-# ---------- PARTNERSHIP ----------
-@dp.message(Command("partnership"))
-async def part(msg: Message):
-    await msg.answer("""🤝 PARTNERSHIP
-1. | |
-2. | |
-3. | |""")
-
-@dp.message(Command("setpartnership"))
-async def setpart(msg: Message, state: FSMContext):
-    await state.set_state(Form.partnership)
-    await msg.answer("🤝 Отправь заявку\nСсылка + описание")
-
-@dp.message(Form.partnership)
-async def part_send(msg: Message, state: FSMContext):
-    text = f"""🤝 PARTNERSHIP
-@{msg.from_user.username}
-
-📌 {msg.text}"""
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅", callback_data=f"ok_{msg.from_user.id}")],
-        [InlineKeyboardButton(text="❌", callback_data=f"no_{msg.from_user.id}")]
-    ])
-
-    for admin in ADMINS:
-        await bot.send_message(admin, text, reply_markup=kb)
-
-    await state.clear()
-    await msg.answer("⏳ Отправлено\nЖди ответа")
+    await msg.answer("⏳ Отправлено\nОжидай пожалуйста некоторое время ! ")
 
 # ---------- ADMIN ----------
 @dp.callback_query(F.data.startswith("ok_"))
