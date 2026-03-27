@@ -37,7 +37,7 @@ class Form(StatesGroup):
     partner_type = State()
     partner_info = State()
 
-# ---------- DB ----------
+# ---------- DATABASE ----------
 async def init_db():
     async with aiosqlite.connect("bot.db") as db:
         await db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, roblox TEXT)")
@@ -50,9 +50,9 @@ async def is_verified(uid):
         async with db.execute("SELECT * FROM users WHERE id=?", (uid,)) as c:
             return await c.fetchone()
 
-async def add_user(uid, name):
+async def add_user(uid, nick):
     async with aiosqlite.connect("bot.db") as db:
-        await db.execute("INSERT OR REPLACE INTO users VALUES (?,?)", (uid, name))
+        await db.execute("INSERT OR REPLACE INTO users VALUES (?,?)", (uid, nick))
         await db.commit()
 
 async def is_banned(uid):
@@ -70,140 +70,159 @@ async def unban_user(uid):
         await db.execute("DELETE FROM bans WHERE id=?", (uid,))
         await db.commit()
 
-async def add_partner(type_, text):
+async def add_partner(t, text):
     async with aiosqlite.connect("bot.db") as db:
-        await db.execute("INSERT INTO partners VALUES (?,?)", (type_, text))
+        await db.execute("INSERT INTO partners VALUES (?,?)", (t, text))
         await db.commit()
 
-async def get_partners(type_):
+async def get_partners(t):
     async with aiosqlite.connect("bot.db") as db:
-        async with db.execute("SELECT text FROM partners WHERE type=?", (type_,)) as c:
+        async with db.execute("SELECT text FROM partners WHERE type=?", (t,)) as c:
             return await c.fetchall()
 
 # ---------- UI ----------
 def back():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("🔙 Назад", callback_data="back")]
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back")]
     ])
 
 def admin_kb(uid, tag):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("✅ Принять", callback_data=f"{tag}_ok_{uid}")],
-        [InlineKeyboardButton("❌ Отклонить", callback_data=f"{tag}_no_{uid}")],
-        [InlineKeyboardButton("🚫 Ban", callback_data=f"ban_{uid}")]
+        [InlineKeyboardButton(text="✅ Принять", callback_data=f"{tag}_ok_{uid}")],
+        [InlineKeyboardButton(text="❌ Отклонить", callback_data=f"{tag}_no_{uid}")],
+        [InlineKeyboardButton(text="🚫 Ban User", callback_data=f"ban_{uid}")]
     ])
 
 # ---------- START ----------
 @dp.message(Command("start"))
 async def start(msg: Message):
-    await msg.answer(f"""
-👋 <b>Привет, {msg.from_user.first_name}</b>
+    text = f"""
+👋 <b>Привет, {msg.from_user.first_name}!</b>
 🎮 <b>Трансфер Маркет RFL</b>
 
-Здесь можно делать объявления, жалобы, переходы и партнёрства!
+Здесь ты можешь:
+• Создать Free Agent
+• Найти клуб или лигу
+• Подать жалобу
+• Оформить трансфер
+• Стать партнером
 
 📌 https://t.me/RFLtransferMarket
 
 📋 <b>Команды:</b>
-/verify
-/announce
-/report
-/transfer
-/setpartnership
-/partnership
-""")
+/verify - пройти верификацию
+/announce - создать объявление
+/report - пожаловаться
+/transfer - переход игрока
+/setpartnership - стать партнером
+/partnership - список партнеров
+"""
+    await msg.answer(text)
 
 # ---------- VERIFY ----------
 @dp.message(Command("verify"))
 async def verify(msg: Message, state: FSMContext):
     if await is_verified(msg.from_user.id):
         return await msg.answer("✅ Уже есть verify")
-    await msg.answer("Введите Roblox ник:")
+    await msg.answer("🛡 Введите Roblox ник:")
     await state.set_state(Form.verify)
 
 @dp.message(Form.verify)
-async def save(msg: Message, state: FSMContext):
+async def save_verify(msg: Message, state: FSMContext):
     await add_user(msg.from_user.id, msg.text)
-    await msg.answer("✅ Готово", reply_markup=back())
+    await msg.answer("✅ Верификация пройдена!", reply_markup=back())
     await state.clear()
 
 # ---------- ANNOUNCE ----------
 @dp.message(Command("announce"))
 async def announce(msg: Message):
     if await is_banned(msg.from_user.id):
-        return await msg.answer("🚫 Бан")
+        return await msg.answer("🚫 Вы забанены")
     if not await is_verified(msg.from_user.id):
-        return await msg.answer("❌ /verify")
+        return await msg.answer("❌ Сначала /verify")
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton("🆓 Free Agent", callback_data="fa")],
-        [InlineKeyboardButton("🏆 Лига", callback_data="league")],
-        [InlineKeyboardButton("🏟 Клуб", callback_data="club")],
-        [InlineKeyboardButton("📄 Другое", callback_data="other")]
+        [InlineKeyboardButton("🏆 Набор в лигу", callback_data="league")],
+        [InlineKeyboardButton("🏟 Набор в клуб", callback_data="club")],
+        [InlineKeyboardButton("📄 Другое", callback_data="other")],
+        [InlineKeyboardButton("🔙 Назад", callback_data="back")]
     ])
-    await msg.answer("Выбери:", reply_markup=kb)
+    await msg.answer("📢 Выберите тип:", reply_markup=kb)
 
-# FA
+# ---------- FREE AGENT ----------
 @dp.callback_query(F.data == "fa")
 async def fa(cb: CallbackQuery):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(p, callback_data=f"pos_{p}") for p in ["GK","CB","CM"]],
         [InlineKeyboardButton(p, callback_data=f"pos_{p}") for p in ["LW","RW","ST"]],
-        [InlineKeyboardButton("ALL", callback_data="pos_ALL")]
+        [InlineKeyboardButton("ALL ROUNDER", callback_data="pos_ALL")]
     ])
-    await cb.message.answer("Позиция:", reply_markup=kb)
+    await cb.message.answer("Выберите позицию:", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("pos_"))
 async def pos(cb: CallbackQuery, state: FSMContext):
     await state.update_data(pos=cb.data.split("_")[1])
-    await cb.message.answer("Напиши о себе (пример: опыт, стиль игры)")
+    await cb.message.answer("✏️ Напишите о себе\nПример:\nОпыт 2 года, сильные стороны: пас, дриблинг")
     await state.set_state(Form.fa_text)
 
 @dp.message(Form.fa_text)
 async def send_fa(msg: Message, state: FSMContext):
+    if not anti_spam(msg.from_user.id):
+        return await msg.answer("⏳ Подожди")
+
     data = await state.get_data()
-    text = f"📢 FA\n@{msg.from_user.username}\n{data['pos']}\n{msg.text}"
+    text = f"""📢 <b>СВОБОДНЫЙ АГЕНТ</b>
+
+💠 @{msg.from_user.username}
+Позиция: {data['pos']}
+О себе: {msg.text}
+#FreeAgent"""
+
     for a in ADMINS:
         await bot.send_message(a, text, reply_markup=admin_kb(msg.from_user.id,"fa"))
-    await msg.answer("Отправлено", reply_markup=back())
+
+    await msg.answer("📨 Отправлено!", reply_markup=back())
     await state.clear()
 
 # ---------- REPORT ----------
 @dp.message(Command("report"))
 async def report(msg: Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton("Игрок", callback_data="r_player")],
-        [InlineKeyboardButton("Клуб", callback_data="r_club")],
-        [InlineKeyboardButton("Лига", callback_data="r_league")]
+        [InlineKeyboardButton("Игрок", callback_data="rep_player")],
+        [InlineKeyboardButton("Клуб", callback_data="rep_club")],
+        [InlineKeyboardButton("Лига", callback_data="rep_league")]
     ])
-    await msg.answer("Тип жалобы:", reply_markup=kb)
+    await msg.answer("Выберите тип жалобы:", reply_markup=kb)
 
-@dp.callback_query(F.data.startswith("r_"))
-async def r_type(cb: CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data.startswith("rep_"))
+async def rep_type(cb: CallbackQuery, state: FSMContext):
     await state.set_state(Form.report_text)
-    await cb.message.answer("Опиши жалобу")
+    await cb.message.answer("Опишите жалобу")
 
 @dp.message(Form.report_text)
-async def send_rep(msg: Message):
+async def send_report(msg: Message):
     for a in ADMINS:
         await bot.send_message(a, msg.text, reply_markup=admin_kb(msg.from_user.id,"rep"))
-    await msg.answer("Отправлено")
+    await msg.answer("📨 Жалоба отправлена", reply_markup=back())
 
 # ---------- TRANSFER ----------
 @dp.message(Command("transfer"))
 async def transfer(msg: Message, state: FSMContext):
-    await msg.answer("Скопируй:\n💠 @user - клуб ➡ клуб")
+    await msg.answer("📢 Скопируй и заполни:\n\n💠 @username - клуб ➡ клуб")
     await state.set_state(Form.transfer)
 
 @dp.message(Form.transfer)
-async def send_tr(msg: Message):
+async def send_transfer(msg: Message):
     if "➡" not in msg.text:
-        return await msg.answer("❌ шаблон")
+        return await msg.answer("❌ Используй шаблон!")
+
     for a in ADMINS:
         await bot.send_message(a, msg.text, reply_markup=admin_kb(msg.from_user.id,"tr"))
-    await msg.answer("Отправлено")
 
-# ---------- PARTNERSHIP ----------
+    await msg.answer("📨 Отправлено!", reply_markup=back())
+
+# ---------- PARTNERS ----------
 @dp.message(Command("setpartnership"))
 async def setp(msg: Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -211,7 +230,7 @@ async def setp(msg: Message):
         [InlineKeyboardButton("Клуб", callback_data="p_club")],
         [InlineKeyboardButton("Новостник", callback_data="p_news")]
     ])
-    await msg.answer("Тип:", reply_markup=kb)
+    await msg.answer("Тип партнёрства:", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("p_"))
 async def ptype(cb: CallbackQuery, state: FSMContext):
@@ -227,7 +246,7 @@ async def psend(msg: Message, state: FSMContext):
             [InlineKeyboardButton("✅", callback_data=f"p_ok_{data['type']}|{msg.text}")],
             [InlineKeyboardButton("❌", callback_data="p_no")]
         ]))
-    await msg.answer("Отправлено")
+    await msg.answer("📨 Отправлено")
 
 @dp.callback_query(F.data.startswith("p_ok"))
 async def pok(cb: CallbackQuery):
@@ -238,7 +257,7 @@ async def pok(cb: CallbackQuery):
 
 @dp.message(Command("partnership"))
 async def plist(msg: Message):
-    text = "Партнёры:\n"
+    text = "🤝 Партнёры:\n"
     for t in ["league","club","news"]:
         data = await get_partners(t)
         if data:
@@ -252,8 +271,8 @@ async def plist(msg: Message):
 async def ban(cb: CallbackQuery):
     uid = int(cb.data.split("_")[1])
     await ban_user(uid)
-    await bot.send_message(uid, "🚫 Бан")
-    await cb.answer()
+    await bot.send_message(uid, "🚫 Вы забанены")
+    await cb.answer("Забанен")
 
 @dp.message(Command("unban"))
 async def unban(msg: Message):
@@ -261,7 +280,13 @@ async def unban(msg: Message):
         return
     uid = int(msg.text.split()[1])
     await unban_user(uid)
-    await msg.answer("Разбан")
+    await msg.answer("✅ Разбанен")
+
+# ---------- BACK ----------
+@dp.callback_query(F.data == "back")
+async def go_back(cb: CallbackQuery):
+    await start(cb.message)
+    await cb.answer()
 
 # ---------- RUN ----------
 async def main():
