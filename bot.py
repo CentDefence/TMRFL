@@ -85,14 +85,17 @@ async def save_verify(msg: Message, state: FSMContext):
 @dp.message(Command("announce"))
 async def announce(msg: Message):
     if not await verified(msg.from_user.id):
-        return await msg.answer("❗ Нужен /verify")
+        return await msg.answer("❗ Нужен /verify для использования команд ! ")
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🆓 Free Agent", callback_data="fa")],
         [InlineKeyboardButton(text="🏆 Лига", callback_data="league")],
         [InlineKeyboardButton(text="🏟 Клуб", callback_data="club")]
     ])
-    await msg.answer("📢 Выбери тип\nКнопками ниже. Free Agent - выставит тебя в роли Free Agent ! Лига - Даст прорекламировать свою же лигу ! Клуб - Поможет найти игроков в клуб ! ", reply_markup=kb)
+    await msg.answer("📢 Выбери тип\nКнопками ниже. 
+Free Agent - выставит тебя в роли Free Agent ! 
+Лига - Даст прорекламировать свою же лигу ! 
+Клуб - Поможет найти игроков в клуб ! ", reply_markup=kb)
 
 # ---------- FREE AGENT ----------
 @dp.callback_query(F.data == "fa")
@@ -117,7 +120,7 @@ async def fa_send(msg: Message, state: FSMContext):
         return await msg.answer("🚫 Бан\nАпелляция: @Sqvnix")
 
     if not spam(msg.from_user.id):
-        return await msg.answer("⏳ Подожди буквально минуточкуc")
+        return await msg.answer("⏳ Подожди буквально минуточку")
 
     data = await state.get_data()
     pos = data["pos"]
@@ -174,11 +177,29 @@ async def fa_send(msg: Message, state: FSMContext):
     await state.clear()
     await msg.answer("⏳ Отправлено\nЖди ответа")
 
+# ---------- LEAGUE ----------
+@dp.callback_query(F.data == "league")
+async def league(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Form.league)
+    await call.message.answer(
+        "🏆 Здраствуйте ! Пожалуйста отправьте ссылку на вашу лигу и также описание к ней ! 
+Пример: t.me/RFLtransferMarket Очень крутой новостник ! "
+    )
+
+# ---------- CLUB -----------
+@dp.callback_query(F.data == "club")
+async def club(call: CallbackQuery, state: FSMContext):
+    await state.set_state(Form.club)
+    await call.message.answer(
+        "🏟 Здраствуйте ! Пожалуйста отправьте ссылку на ваш новостник клуба и также описание к нему ! 
+Пример: t.me/RFLtransferMarket Очень крутой новостник И мы требуем набор игроков ! "
+    )
+
 # ---------- REPORT ----------
 @dp.message(Command("report"))
 async def report(msg: Message, state: FSMContext):
     await state.set_state(Form.report)
-    await msg.answer("🚨 Опиши жалобу\nКратко")
+    await msg.answer("🚨 Опишите жалобу\nПример жалобы: THAHKYOU200/@Sqvnix Слишком противен и нуждается в бане ! ")
 
 @dp.message(Form.report)
 async def rep_send(msg: Message, state: FSMContext):
@@ -196,13 +217,14 @@ async def rep_send(msg: Message, state: FSMContext):
         await bot.send_message(admin, text, reply_markup=kb)
 
     await state.clear()
-    await msg.answer("⏳ Отправлено\nОжидай")
+    await msg.answer("⏳ Отправлено\nОжидайте ответа от администраторов бота. ")
 
 # ---------- TRANSFER ----------
 @dp.message(Command("transfer"))
 async def transfer(msg: Message, state: FSMContext):
     await state.set_state(Form.transfer)
-    await msg.answer("📢 Напиши переход\nКлуб➡️Клуб")
+    await msg.answer("📢 Напишите пожалуйста по шаблону /n@Sqvnix Клуб с которого вы перешли --> Клуб в который вы перешли.
+пожалуйста пишите по шаблону.")
 
 @dp.message(Form.transfer)
 async def transfer_send(msg: Message, state: FSMContext):
@@ -221,21 +243,21 @@ async def transfer_send(msg: Message, state: FSMContext):
 @dp.callback_query(F.data.startswith("ok_"))
 async def ok(call: CallbackQuery):
     uid = int(call.data.split("_")[1])
-    await bot.send_message(uid, "✅ Принято\nЖди публикации")
+    await bot.send_message(uid, "✅ Принято\nЖдите публикацию в наш канал ! ")
     await call.message.edit_text("✅ Принято")
 
 @dp.callback_query(F.data.startswith("no_"))
 async def no(call: CallbackQuery):
     uid = int(call.data.split("_")[1])
-    await bot.send_message(uid, "❌ Отклонено\nНе спамь")
+    await bot.send_message(uid, "❌ Отклонено\n пожалуйста отредактируйте вашу заявку либо поработайте над ней.")
     await call.message.edit_text("❌ Отклонено")
 
 @dp.callback_query(F.data.startswith("ban_"))
 async def ban(call: CallbackQuery):
     uid = int(call.data.split("_")[1])
     banned.add(uid)
-    await bot.send_message(uid, "🚫 Бан\nАпелляция: @sqvnix")
-    await call.message.edit_text("🚫 Забанен")
+    await bot.send_message(uid, "🚫 Бан\nЧтобы подать аппеляцию напишите пожалуйста : @sqvnix")
+    await call.message.edit_text("🚫 Вы ")
 
 @dp.message(Command("unban"))
 async def unban(msg: Message):
