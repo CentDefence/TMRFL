@@ -18,7 +18,7 @@ from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-TOKEN = os.getenv("BOT_TOKEN")  # <-- твой токен
+TOKEN = os.getenv("8712937703:AAEULzwqOk_XmNJhTwb2-OX4ISZ7pvBwbbA")  # <-- твой токен
 ADMINS = [8214590613]  # <-- твои ID админов
 
 bot = Bot(TOKEN)
